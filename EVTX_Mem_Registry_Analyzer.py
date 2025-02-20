@@ -9,75 +9,117 @@ import pandas as pd
 from fpdf import FPDF
 import json
 from datetime import datetime
-import os
 
 
-def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf"):
+
+def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf", entries_per_section=None, page_width=None):
     """
     Export analysis results from CSV and JSON files to a structured PDF report.
     
     Args:
         output_dir (str): Directory containing the analysis output files
         report_name (str): Name of the output PDF file
+        entries_per_section (int): Number of entries to show per section. None for all entries.
+        page_width (float): Custom page width in mm. None for default A4.
     """
     class PDF(FPDF):
         def header(self):
-            # Header with logo and title
             self.set_font('Arial', 'B', 15)
             self.cell(0, 10, 'Forensic Analysis Report', 0, 1, 'C')
             self.ln(10)
             
         def footer(self):
-            # Footer with page number
             self.set_y(-15)
             self.set_font('Arial', 'I', 8)
             self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
 
-    def add_section_header(pdf, title):
+    def add_section_header(pdf, title, total_entries=None, displayed_entries=None):
         pdf.set_font('Arial', 'B', 12)
         pdf.set_fill_color(200, 200, 200)
-        pdf.cell(0, 10, title, 0, 1, 'L', fill=True)
+        header_text = title
+        if total_entries is not None:
+            header_text += f" (Showing {displayed_entries} of {total_entries} entries)"
+        pdf.cell(0, 10, header_text, 0, 1, 'L', fill=True)
         pdf.ln(5)
 
     def add_table(pdf, data, headers):
-        # Configure table settings
+        if not data:
+            pdf.set_font('Arial', 'I', 10)
+            pdf.cell(0, 10, "No data available for this section", 0, 1)
+            return
+
+        # Calculate column widths based on content
+        pdf.set_font('Arial', '', 8)
+        col_widths = []
+        for i in range(len(headers)):
+            header_width = pdf.get_string_width(str(headers[i])) + 4
+            max_data_width = max(pdf.get_string_width(str(row[i]))+ 4 for row in data[:5])
+            col_widths.append(min(max(header_width, max_data_width), 50))  # Cap at 50mm
+            
+        # Scale widths if they exceed page width
+        available_width = pdf.w - 20  # 10mm margin on each side
+        total_width = sum(col_widths)
+        if total_width > available_width:
+            scale_factor = available_width / total_width
+            col_widths = [w * scale_factor for w in col_widths]
+
+        # Headers
         pdf.set_font('Arial', 'B', 9)
-        col_width = pdf.w / len(headers) - 10
-        row_height = 6
-        
-        # Add headers
-        for header in headers:
-            pdf.cell(col_width, row_height, str(header), 1)
-        pdf.ln(row_height)
-        
-        # Add data
+        for i, header in enumerate(headers):
+            pdf.cell(col_widths[i], 6, str(header), 1)
+        pdf.ln()
+
+        # Data
         pdf.set_font('Arial', '', 8)
         for row in data:
-            for item in row:
-                pdf.cell(col_width, row_height, str(item)[:30], 1)
-            pdf.ln(row_height)
+            # Check if we need to add a new page
+            if pdf.get_y() + 6 > pdf.page_break_trigger:
+                pdf.add_page()
+                # Repeat headers
+                pdf.set_font('Arial', 'B', 9)
+                for i, header in enumerate(headers):
+                    pdf.cell(col_widths[i], 6, str(header), 1)
+                pdf.ln()
+                pdf.set_font('Arial', '', 8)
+            
+            for i, item in enumerate(row):
+                # Truncate long strings with ellipsis
+                content = str(item)
+                if pdf.get_string_width(content) > col_widths[i]:
+                    while pdf.get_string_width(content + "...") > col_widths[i]:
+                        content = content[:-1]
+                    content += "..."
+                pdf.cell(col_widths[i], 6, content, 1)
+            pdf.ln()
 
     # Create PDF object
     pdf = PDF()
+    if page_width:
+        pdf = PDF('L') if page_width > 297 else PDF('P')  # Landscape if very wide
     pdf.add_page()
     
     # Add report metadata
     pdf.set_font('Arial', '', 10)
     pdf.cell(0, 10, f'Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', 0, 1)
     pdf.cell(0, 10, f'Source Directory: {output_dir}', 0, 1)
+    if entries_per_section:
+        pdf.cell(0, 10, f'Entries per section: {entries_per_section}', 0, 1)
     pdf.ln(10)
 
     # Process EvtxECmd CSV output
     evtx_files = [f for f in os.listdir(output_dir) if f.endswith('_EvtxECmd.csv')]
     if evtx_files:
-        add_section_header(pdf, 'Windows Event Log Analysis')
         for file in evtx_files:
             try:
                 df = pd.read_csv(os.path.join(output_dir, file))
-                # Select important columns
+                total_entries = len(df)
                 important_cols = ['TimeCreated', 'EventId', 'Channel', 'Computer', 'Message']
-                display_df = df[important_cols].head(20)  # Limit to first 20 entries
+                display_df = df[important_cols]
+                if entries_per_section:
+                    display_df = display_df.head(entries_per_section)
                 
+                add_section_header(pdf, 'Windows Event Log Analysis', total_entries, 
+                                 len(display_df) if entries_per_section else total_entries)
                 pdf.set_font('Arial', '', 10)
                 pdf.cell(0, 10, f'Source: {file}', 0, 1)
                 add_table(pdf, display_df.values.tolist(), important_cols)
@@ -88,18 +130,22 @@ def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf"):
     # Process Volatility JSON output
     volatility_files = [f for f in os.listdir(output_dir) if f.endswith('.json')]
     if volatility_files:
-        add_section_header(pdf, 'Memory Analysis')
         for file in volatility_files:
             try:
                 with open(os.path.join(output_dir, file), 'r') as f:
                     data = json.load(f)
                     if isinstance(data, list):
-                        # Extract process information
                         process_data = [[p.get('PID', ''), p.get('PPID', ''), 
                                        p.get('ImageFileName', ''), p.get('CreateTime', '')] 
                                       for p in data]
+                        total_entries = len(process_data)
+                        if entries_per_section:
+                            process_data = process_data[:entries_per_section]
+                        
+                        add_section_header(pdf, 'Memory Analysis', total_entries,
+                                         len(process_data))
                         headers = ['PID', 'PPID', 'Process Name', 'Create Time']
-                        add_table(pdf, process_data[:20], headers)  # Limit to first 20 processes
+                        add_table(pdf, process_data, headers)
                 pdf.ln(10)
             except Exception as e:
                 pdf.cell(0, 10, f'Error processing {file}: {str(e)}', 0, 1)
@@ -107,14 +153,17 @@ def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf"):
     # Process RECmd CSV output
     recmd_files = [f for f in os.listdir(output_dir) if f.endswith('_RECmd.csv')]
     if recmd_files:
-        add_section_header(pdf, 'Registry Analysis')
         for file in recmd_files:
             try:
                 df = pd.read_csv(os.path.join(output_dir, file))
-                # Select important columns
+                total_entries = len(df)
                 important_cols = ['KeyPath', 'ValueName', 'ValueData', 'LastWriteTimestamp']
-                display_df = df[important_cols].head(20)  # Limit to first 20 entries
+                display_df = df[important_cols]
+                if entries_per_section:
+                    display_df = display_df.head(entries_per_section)
                 
+                add_section_header(pdf, 'Registry Analysis', total_entries,
+                                 len(display_df) if entries_per_section else total_entries)
                 pdf.set_font('Arial', '', 10)
                 pdf.cell(0, 10, f'Source: {file}', 0, 1)
                 add_table(pdf, display_df.values.tolist(), important_cols)
