@@ -5,6 +5,11 @@
 import subprocess
 import os
 import sys
+import pandas as pd
+from fpdf import FPDF
+import json
+from datetime import datetime
+import os
 
 def run_evtxecmd(evtx_file, output_dir):
     """
