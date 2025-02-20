@@ -210,6 +210,10 @@ def main():
 
     # Run RECmd
     run_recmd(registry_hive, output_dir)
+    try:
+        export_to_pdf(output_dir)
+    except Exception as e:
+        print(f"An error occurec: {e}")
 
     print("[+] All tools executed successfully.")
 
