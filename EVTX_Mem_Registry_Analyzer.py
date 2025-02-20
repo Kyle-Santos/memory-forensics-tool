@@ -48,34 +48,28 @@ def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf", entrie
             pdf.cell(0, 10, "No data available for this section", 0, 1)
             return
 
-        # Calculate column widths based on content
         pdf.set_font('Arial', '', 8)
         col_widths = []
         for i in range(len(headers)):
             header_width = pdf.get_string_width(str(headers[i])) + 4
             max_data_width = max(pdf.get_string_width(str(row[i]))+ 4 for row in data[:5])
-            col_widths.append(min(max(header_width, max_data_width), 50))  # Cap at 50mm
+            col_widths.append(min(max(header_width, max_data_width), 50))  
             
-        # Scale widths if they exceed page width
-        available_width = pdf.w - 20  # 10mm margin on each side
+        available_width = pdf.w - 20  
         total_width = sum(col_widths)
         if total_width > available_width:
             scale_factor = available_width / total_width
             col_widths = [w * scale_factor for w in col_widths]
 
-        # Headers
         pdf.set_font('Arial', 'B', 9)
         for i, header in enumerate(headers):
             pdf.cell(col_widths[i], 6, str(header), 1)
         pdf.ln()
 
-        # Data
         pdf.set_font('Arial', '', 8)
         for row in data:
-            # Check if we need to add a new page
             if pdf.get_y() + 6 > pdf.page_break_trigger:
                 pdf.add_page()
-                # Repeat headers
                 pdf.set_font('Arial', 'B', 9)
                 for i, header in enumerate(headers):
                     pdf.cell(col_widths[i], 6, str(header), 1)
@@ -83,7 +77,6 @@ def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf", entrie
                 pdf.set_font('Arial', '', 8)
             
             for i, item in enumerate(row):
-                # Truncate long strings with ellipsis
                 content = str(item)
                 if pdf.get_string_width(content) > col_widths[i]:
                     while pdf.get_string_width(content + "...") > col_widths[i]:
@@ -92,13 +85,11 @@ def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf", entrie
                 pdf.cell(col_widths[i], 6, content, 1)
             pdf.ln()
 
-    # Create PDF object
     pdf = PDF()
     if page_width:
-        pdf = PDF('L') if page_width > 297 else PDF('P')  # Landscape if very wide
+        pdf = PDF('L') if page_width > 297 else PDF('P')  
     pdf.add_page()
     
-    # Add report metadata
     pdf.set_font('Arial', '', 10)
     pdf.cell(0, 10, f'Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', 0, 1)
     pdf.cell(0, 10, f'Source Directory: {output_dir}', 0, 1)
@@ -106,7 +97,6 @@ def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf", entrie
         pdf.cell(0, 10, f'Entries per section: {entries_per_section}', 0, 1)
     pdf.ln(10)
 
-    # Process EvtxECmd CSV output
     evtx_files = [f for f in os.listdir(output_dir) if f.endswith('_EvtxECmd.csv')]
     if evtx_files:
         for file in evtx_files:
@@ -127,7 +117,6 @@ def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf", entrie
             except Exception as e:
                 pdf.cell(0, 10, f'Error processing {file}: {str(e)}', 0, 1)
 
-    # Process Volatility JSON output
     volatility_files = [f for f in os.listdir(output_dir) if f.endswith('.json')]
     if volatility_files:
         for file in volatility_files:
@@ -150,7 +139,6 @@ def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf", entrie
             except Exception as e:
                 pdf.cell(0, 10, f'Error processing {file}: {str(e)}', 0, 1)
 
-    # Process RECmd CSV output
     recmd_files = [f for f in os.listdir(output_dir) if f.endswith('_RECmd.csv')]
     if recmd_files:
         for file in recmd_files:
@@ -171,7 +159,6 @@ def export_to_pdf(output_dir, report_name="forensic_analysis_report.pdf", entrie
             except Exception as e:
                 pdf.cell(0, 10, f'Error processing {file}: {str(e)}', 0, 1)
 
-    # Save the PDF
     output_path = os.path.join(output_dir, report_name)
     pdf.output(output_path)
     print(f"[+] PDF report generated successfully: {output_path}")
