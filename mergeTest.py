@@ -8,133 +8,207 @@ import glob
 
 def run_evtxecmd(evtx_file, output_dir):
     """
-    Run EvtxECmd to parse EVTX files.
+    Run EvtxECmd to parse EVTX files and capture output.
     """
     print("[*] Running EvtxECmd...")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = os.path.join(output_dir, f"evtx_output_{timestamp}.csv")
+    
     cmd = [
         "EvtxECmd\\EvtxECmd.exe",
-        "-d", evtx_file,
-        "--csv", output_dir
+        "-f", evtx_file,
+        "--csv", output_file
     ]
     try:
-        subprocess.run(cmd, check=True)
-        print("[+] EvtxECmd completed successfully.")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        with open(os.path.join(output_dir, f"evtx_log_{timestamp}.txt"), 'w') as f:
+            f.write(result.stdout)
+        print(f"[+] EvtxECmd completed successfully. Output saved to {output_file}")
+        return output_file
     except subprocess.CalledProcessError as e:
         print(f"[-] EvtxECmd failed: {e}")
+        print(f"Error output: {e.stderr}")
         sys.exit(1)
 
 def run_volatility(memory_image, output_dir, profile="Win7SP1x64"):
     """
-    Run Volatility to analyze memory and save output in CSV format.
+    Run Volatility to analyze memory and capture output.
     """
     os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     print("[*] Running Volatility 2.6 Memory Analysis...")
 
+    outputs = {}
     plugins = {
-        "Image Information": ["imageinfo"],
-        "Registry Hives": ["hivelist"],
-        "Dump Registry": ["dumpregistry", "-D", "artifacts"],
-        "Dump Files": ["dumpfiles", "-r=.extx", "-D", "artifacts"],
+        "imageinfo": [],
+        "pslist": [],
+        "hivelist": [],
+        "filescan": []
     }
     
-    for desc, plugin in plugins.items():
-        output_txt_file = os.path.join(output_dir, f"{plugin[0]}.txt")
-        cmd = ["volatility_2.6\\volatility_2.6.exe", "-f", memory_image, "--profile=" + profile] + plugin
+    for plugin_name, plugin_args in plugins.items():
+        output_file = os.path.join(output_dir, f"vol_{plugin_name}_{timestamp}.json")
+        cmd = ["volatility_2.6\\volatility_2.6.exe", 
+               "-f", memory_image, 
+               "--profile=" + profile,
+               plugin_name,
+               "--output=json",
+               "--output-file=" + output_file] + plugin_args
         
         try:
-            print(f"[*] Running {desc} Analysis...")
-            with open(output_txt_file, "w") as out:
-                subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE, check=True)
-            print(f"[+] {desc} Analysis Completed. Output saved to {output_txt_file}")
+            print(f"[*] Running {plugin_name} analysis...")
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            outputs[plugin_name] = output_file
+            print(f"[+] {plugin_name} completed. Output saved to {output_file}")
         except subprocess.CalledProcessError as e:
-            print(f"[-] {desc} Analysis Failed: {e.stderr.decode()}")
+            print(f"[-] {plugin_name} failed: {e.stderr}")
+            continue
+    
+    return outputs
 
 def run_recmd(registry_hive, output_dir):
     """
-    Run RECmd to parse Registry hives.
+    Run RECmd to parse Registry hives and capture output.
     """
     print("[*] Running RECmd...")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = os.path.join(output_dir, f"registry_output_{timestamp}.csv")
+    
     cmd = [
         "RECmd\\RECmd.exe",
-        "-d", registry_hive,
+        "-f", registry_hive,
         "--bn", "DFIRBatch.reb",
-        "--csv", output_dir
+        "--csv", output_file
     ]
     try:
-        subprocess.run(cmd, shell=True, check=True)
-        print("[+] RECmd completed successfully.")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        with open(os.path.join(output_dir, f"recmd_log_{timestamp}.txt"), 'w') as f:
+            f.write(result.stdout)
+        print(f"[+] RECmd completed successfully. Output saved to {output_file}")
+        return output_file
     except subprocess.CalledProcessError as e:
         print(f"[-] RECmd failed: {e}")
+        print(f"Error output: {e.stderr}")
         sys.exit(1)
 
 def merge_forensic_data(output_dir):
     """
-    Merges outputs from all tools into organized Excel and CSV files.
+    Merges outputs from all tools into organized Excel and CSV files with flexible column handling.
     """
     print("[*] Merging forensic data outputs...")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     try:
-        # Find the most recent CSV files for each tool
+        # Find relevant files
         evtx_files = glob.glob(os.path.join(output_dir, "*EvtxECmd*.csv"))
-        vol_files = glob.glob(os.path.join(output_dir, "imageinfo.txt"))  # Adjust based on actual output
+        vol_files = glob.glob(os.path.join(output_dir, "vol_*.json"))
         reg_files = glob.glob(os.path.join(output_dir, "*RECmd*.csv"))
         
-        # Load EVTX data
-        evtx_df = pd.DataFrame()
+        all_dfs = []
+        
+        # Load EVTX data if available
         if evtx_files:
-            evtx_df = pd.read_csv(evtx_files[0])
-            evtx_df['Data_Source'] = 'EVTX'
+            try:
+                evtx_df = pd.read_csv(evtx_files[0])
+                evtx_df['Data_Source'] = 'EVTX'
+                all_dfs.append(evtx_df)
+                print(f"[+] Loaded EVTX data with columns: {evtx_df.columns.tolist()}")
+            except Exception as e:
+                print(f"[-] Error loading EVTX data: {e}")
         
-        # Load Volatility data (adjust parsing based on actual output format)
-        vol_df = pd.DataFrame()
-        if vol_files:
-            with open(vol_files[0], 'r') as f:
-                # Parse the text file into a structured format
-                # This will need to be adjusted based on actual output format
-                vol_data = f.readlines()
-                # Add basic parsing logic here
-                vol_df = pd.DataFrame(vol_data, columns=['Raw_Data'])
-                vol_df['Data_Source'] = 'Memory'
+        # Load Volatility data if available
+        for vol_file in vol_files:
+            try:
+                with open(vol_file, 'r') as f:
+                    vol_data = json.load(f)
+                vol_df = pd.DataFrame(vol_data)
+                vol_df['Data_Source'] = f'Memory_{os.path.basename(vol_file)}'
+                all_dfs.append(vol_df)
+                print(f"[+] Loaded Volatility data from {os.path.basename(vol_file)}")
+            except Exception as e:
+                print(f"[-] Error loading Volatility data from {vol_file}: {e}")
         
-        # Load Registry data
-        reg_df = pd.DataFrame()
+        # Load Registry data if available
         if reg_files:
-            reg_df = pd.read_csv(reg_files[0])
-            reg_df['Data_Source'] = 'Registry'
+            try:
+                reg_df = pd.read_csv(reg_files[0])
+                reg_df['Data_Source'] = 'Registry'
+                all_dfs.append(reg_df)
+                print(f"[+] Loaded Registry data with columns: {reg_df.columns.tolist()}")
+            except Exception as e:
+                print(f"[-] Error loading Registry data: {e}")
         
-        # Create multi-sheet Excel output
-        output_xlsx = os.path.join(output_dir, "forensic_analysis_combined.xlsx")
-        with pd.ExcelWriter(output_xlsx) as writer:
-            if not evtx_df.empty:
-                evtx_df.to_excel(writer, sheet_name='EVTX_Events', index=False)
-            if not vol_df.empty:
-                vol_df.to_excel(writer, sheet_name='Memory_Analysis', index=False)
-            if not reg_df.empty:
-                reg_df.to_excel(writer, sheet_name='Registry_Data', index=False)
+        if not all_dfs:
+            print("[-] No data found to merge")
+            return False
         
-        # Create unified timeline CSV
-        # Select and standardize relevant columns from each source
-        timeline_entries = []
+        # Create outputs directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
         
-        if not evtx_df.empty:
-            evtx_selected = evtx_df[['TimeCreated', 'EventID', 'Message']].copy()
-            evtx_selected['Source'] = 'EVTX'
-            timeline_entries.append(evtx_selected)
+        # Save individual sheets
+        excel_output = os.path.join(output_dir, f"forensic_analysis_{timestamp}.xlsx")
+        with pd.ExcelWriter(excel_output) as writer:
+            for i, df in enumerate(all_dfs):
+                sheet_name = f"Data_Source_{i}"
+                try:
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    print(f"[+] Saved sheet {sheet_name}")
+                except Exception as e:
+                    print(f"[-] Error saving sheet {sheet_name}: {e}")
         
-        if not vol_df.empty:
-            # Adjust column selection based on actual Volatility output
-            vol_selected = vol_df[['Raw_Data']].copy()
-            vol_selected['Source'] = 'Memory'
-            timeline_entries.append(vol_selected)
+        # Create combined timeline based on available columns
+        try:
+            # Initialize empty lists for timeline entries
+            timeline_entries = []
+            
+            for df in all_dfs:
+                # Create a copy of the dataframe for timeline
+                timeline_df = df.copy()
+                
+                # Try to identify time-related columns
+                time_columns = [col for col in df.columns if any(time_word in col.lower() 
+                    for time_word in ['time', 'date', 'created', 'modified', 'accessed'])]
+                
+                # Try to identify description or message columns
+                desc_columns = [col for col in df.columns if any(desc_word in col.lower() 
+                    for desc_word in ['message', 'description', 'details', 'data', 'value', 'path'])]
+                
+                if time_columns:
+                    # Use the first time column found
+                    timeline_df['Timestamp'] = timeline_df[time_columns[0]]
+                else:
+                    timeline_df['Timestamp'] = pd.Timestamp.now()
+                
+                if desc_columns:
+                    # Use the first description column found
+                    timeline_df['Description'] = timeline_df[desc_columns[0]]
+                else:
+                    # Create a description from all available columns
+                    timeline_df['Description'] = timeline_df.apply(
+                        lambda x: ' | '.join(f"{k}: {v}" for k, v in x.items() if k != 'Data_Source'), 
+                        axis=1
+                    )
+                
+                # Select only necessary columns for timeline
+                timeline_df = timeline_df[['Timestamp', 'Description', 'Data_Source']]
+                timeline_entries.append(timeline_df)
+            
+            # Combine all timeline entries
+            if timeline_entries:
+                combined_timeline = pd.concat(timeline_entries, ignore_index=True)
+                # Try to convert timestamp to datetime if it's not already
+                try:
+                    combined_timeline['Timestamp'] = pd.to_datetime(combined_timeline['Timestamp'])
+                    combined_timeline = combined_timeline.sort_values('Timestamp')
+                except Exception as e:
+                    print(f"[-] Error converting timestamps: {e}")
+                
+                timeline_output = os.path.join(output_dir, f"forensic_timeline_{timestamp}.csv")
+                combined_timeline.to_csv(timeline_output, index=False)
+                print(f"[+] Created combined timeline at {timeline_output}")
         
-        if not reg_df.empty:
-            reg_selected = reg_df[['LastWriteTime', 'KeyPath', 'ValueName']].copy()
-            reg_selected['Source'] = 'Registry'
-            timeline_entries.append(reg_selected)
-        
-        if timeline_entries:
-            combined_timeline = pd.concat(timeline_entries, ignore_index=True)
-            combined_timeline.to_csv(os.path.join(output_dir, "forensic_timeline.csv"), index=False)
+        except Exception as e:
+            print(f"[-] Error creating timeline: {e}")
         
         print(f"[+] Data merger completed. Outputs saved to {output_dir}")
         return True
@@ -160,13 +234,20 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+<<<<<<< HEAD
     # Run analysis tools
     # run_volatility(memory_image, output_dir)
     # run_evtxecmd(evtx_file, output_dir)
     # run_recmd(registry_hive, output_dir)
+=======
+    # Run tools and capture their outputs
+    evtx_output = run_evtxecmd(evtx_file, output_dir)
+    vol_outputs = run_volatility(memory_image, output_dir)
+    reg_output = run_recmd(registry_hive, output_dir)
+>>>>>>> 2f9d4213da9c99ee95ce1a98a7832c7d5d062d97
 
     # Merge the results
-    merge_forensic_data(output_dir)
+    merge_forensic_data(evtx_output, vol_outputs, reg_output, output_dir)
 
     print("[+] Analysis and merger completed successfully.")
 
