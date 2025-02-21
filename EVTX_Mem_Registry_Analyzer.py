@@ -13,7 +13,7 @@ def run_evtxecmd(evtx_file, output_dir):
     """
     print("[*] Running EvtxECmd...")
     cmd = [
-        "EvtxECmd\EvtxECmd.exe",
+        "EvtxECmd\\EvtxECmd.exe",
         "-d", evtx_file,
         "--csv", output_dir
     ]
@@ -61,15 +61,14 @@ def run_recmd(registry_hive, output_dir):
     cmd = [
         "RECmd\\RECmd.exe",
         "-d", registry_hive,
+        "--bn", "DFIRBatch.reb",
         "--csv", output_dir
-        # One of the following switches is required: --sk | --sv | --sd | --ss | --kn | --Base64 | --MinSize | --bn
-        # Need to identify what is needed above
     ]
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, shell=True, check=True)
         print("[+] RECmd completed successfully.")
     except subprocess.CalledProcessError as e:
-        print("[-] RECmd failed:".format(e))
+        print(f"[-] RECmd failed: {e}")
         sys.exit(1)
 
 def main():
@@ -96,7 +95,7 @@ def main():
     run_evtxecmd(evtx_file, output_dir)
 
     # Run RECmd
-    # run_recmd(registry_hive, output_dir)
+    run_recmd(registry_hive, output_dir)
 
     print("[+] All tools executed successfully.")
 
