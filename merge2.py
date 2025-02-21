@@ -1,3 +1,7 @@
+# EvtxECmd: Parses the EVTX file and outputs the results in CSV format.
+# Volatility: Analyzes the memory image and outputs the process list in JSON format.
+# RECmd: Parses the Registry hive and outputs the results in CSV format.
+
 import subprocess
 import os
 import sys
@@ -8,87 +12,66 @@ import glob
 
 def run_evtxecmd(evtx_file, output_dir):
     """
-    Run EvtxECmd to parse EVTX files and capture output.
+    Run EvtxECmd to parse EVTX files.
     """
     print("[*] Running EvtxECmd...")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = os.path.join(output_dir, f"evtx_output_{timestamp}.csv")
-    
     cmd = [
         "EvtxECmd\\EvtxECmd.exe",
-        "-f", evtx_file,
-        "--csv", output_file
+        "-d", evtx_file,
+        "--csv", output_dir
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        with open(os.path.join(output_dir, f"evtx_log_{timestamp}.txt"), 'w') as f:
-            f.write(result.stdout)
-        print(f"[+] EvtxECmd completed successfully. Output saved to {output_file}")
-        return output_file
+        subprocess.run(cmd, check=True)
+        print("[+] EvtxECmd completed successfully.")
     except subprocess.CalledProcessError as e:
         print(f"[-] EvtxECmd failed: {e}")
-        print(f"Error output: {e.stderr}")
         sys.exit(1)
 
 def run_volatility(memory_image, output_dir, profile="Win7SP1x64"):
     """
-    Run Volatility to analyze memory and capture output.
+    Run Volatility to analyze memory and save output in CSV format.
     """
+
+    # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
     print("[*] Running Volatility 2.6 Memory Analysis...")
 
-    outputs = {}
     plugins = {
-        "imageinfo": [],
-        "pslist": [],
-        "hivelist": [],
-        "filescan": []
+        "Image Information": ["imageinfo"],
+        "Registry Hives": ["hivelist"],
+        "Dump Registry": ["dumpregistry", "-D", "artifacts"],
+        "Dump Files": ["dumpfiles", "-r=.extx", "-D", "artifacts"],
     }
     
-    for plugin_name, plugin_args in plugins.items():
-        output_file = os.path.join(output_dir, f"vol_{plugin_name}_{timestamp}.json")
-        cmd = ["volatility_2.6\\volatility_2.6.exe", 
-               "-f", memory_image, 
-               "--profile=" + profile,
-               plugin_name,
-               "--output=json",
-               "--output-file=" + output_file] + plugin_args
+    for desc, plugin in plugins.items():
+        output_txt_file = os.path.join(output_dir, f"{plugin[0]}.txt")
+        cmd = ["volatility_2.6\\volatility_2.6.exe", "-f", memory_image, "--profile=" + profile] + plugin
         
         try:
-            print(f"[*] Running {plugin_name} analysis...")
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            outputs[plugin_name] = output_file
-            print(f"[+] {plugin_name} completed. Output saved to {output_file}")
+            print(f"[*] Running {desc} Analysis...")
+            with open(output_txt_file, "w") as out:
+                subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE, check=True)
+            print(f"[+] {desc} Analysis Completed. Output saved to {output_txt_file}")
         except subprocess.CalledProcessError as e:
-            print(f"[-] {plugin_name} failed: {e.stderr}")
-            continue
-    
-    return outputs
+            print(f"[-] {desc} Analysis Failed: {e.stderr.decode()}")
 
 def run_recmd(registry_hive, output_dir):
     """
-    Run RECmd to parse Registry hives and capture output.
+    Run RECmd to parse Registry hives.
     """
     print("[*] Running RECmd...")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = os.path.join(output_dir, f"registry_output_{timestamp}.csv")
-    
     cmd = [
         "RECmd\\RECmd.exe",
-        "-f", registry_hive,
+        "-d", registry_hive,
         "--bn", "DFIRBatch.reb",
-        "--csv", output_file
+        "--csv", output_dir
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        with open(os.path.join(output_dir, f"recmd_log_{timestamp}.txt"), 'w') as f:
-            f.write(result.stdout)
-        print(f"[+] RECmd completed successfully. Output saved to {output_file}")
-        return output_file
+        subprocess.run(cmd, shell=True, check=True)
+        print("[+] RECmd completed successfully.")
     except subprocess.CalledProcessError as e:
         print(f"[-] RECmd failed: {e}")
-        print(f"Error output: {e.stderr}")
         sys.exit(1)
 
 def merge_forensic_data(output_dir):
@@ -217,9 +200,10 @@ def merge_forensic_data(output_dir):
         print(f"[-] Error merging data: {str(e)}")
         return False
 
+
 def main():
     if len(sys.argv) != 5:
-        print("\nUsage: python forensics_analyzer.py <evtx_file> <memory_image> <registry_hive> <output_dir>\n")
+        print("\nUsage: python combine_tools.py <evtx_file> <memory_image> <registry_hive> <output_dir>\n")
         print("<evtx_file>: Path to the EVTX file you want to analyze.",
               "<memory_image>: Path to the memory image file for Volatility.",
               "<registry_hive>: Path to the Registry hive file for RECmd.",
@@ -234,16 +218,19 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    # Run Volatility
+    # run_volatility(memory_image, output_dir)
 
-    # Run tools and capture their outputs
-    run_evtxecmd(evtx_file, output_dir)
-    run_volatility(memory_image, output_dir)
-    run_recmd(registry_hive, output_dir)
+    # Run EvtxECmd
+    # run_evtxecmd(evtx_file, output_dir)
+
+    # Run RECmd
+    # run_recmd(registry_hive, output_dir)
 
     # Merge the results
     merge_forensic_data(output_dir)
 
-    print("[+] Analysis and merger completed successfully.")
+    print("[+] All tools executed successfully.")
 
 if __name__ == "__main__":
     main()
