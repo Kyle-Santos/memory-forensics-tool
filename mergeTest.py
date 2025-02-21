@@ -91,73 +91,124 @@ def run_recmd(registry_hive, output_dir):
         print(f"Error output: {e.stderr}")
         sys.exit(1)
 
-def merge_forensic_data(evtx_output, vol_outputs, reg_output, output_dir):
+def merge_forensic_data(output_dir):
     """
-    Merges outputs from all tools into organized Excel and CSV files.
+    Merges outputs from all tools into organized Excel and CSV files with flexible column handling.
     """
     print("[*] Merging forensic data outputs...")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     try:
-        # Load EVTX data
-        evtx_df = pd.read_csv(evtx_output) if evtx_output else pd.DataFrame()
-        if not evtx_df.empty:
-            evtx_df['Data_Source'] = 'EVTX'
+        # Find relevant files
+        evtx_files = glob.glob(os.path.join(output_dir, "*EvtxECmd*.csv"))
+        vol_files = glob.glob(os.path.join(output_dir, "vol_*.json"))
+        reg_files = glob.glob(os.path.join(output_dir, "*RECmd*.csv"))
         
-        # Load Volatility data
-        vol_dfs = {}
-        for plugin_name, output_file in vol_outputs.items():
+        all_dfs = []
+        
+        # Load EVTX data if available
+        if evtx_files:
             try:
-                with open(output_file, 'r') as f:
+                evtx_df = pd.read_csv(evtx_files[0])
+                evtx_df['Data_Source'] = 'EVTX'
+                all_dfs.append(evtx_df)
+                print(f"[+] Loaded EVTX data with columns: {evtx_df.columns.tolist()}")
+            except Exception as e:
+                print(f"[-] Error loading EVTX data: {e}")
+        
+        # Load Volatility data if available
+        for vol_file in vol_files:
+            try:
+                with open(vol_file, 'r') as f:
                     vol_data = json.load(f)
-                vol_dfs[plugin_name] = pd.DataFrame(vol_data)
-                vol_dfs[plugin_name]['Data_Source'] = f'Memory_{plugin_name}'
-            except (json.JSONDecodeError, FileNotFoundError) as e:
-                print(f"Warning: Could not load Volatility {plugin_name} data: {e}")
+                vol_df = pd.DataFrame(vol_data)
+                vol_df['Data_Source'] = f'Memory_{os.path.basename(vol_file)}'
+                all_dfs.append(vol_df)
+                print(f"[+] Loaded Volatility data from {os.path.basename(vol_file)}")
+            except Exception as e:
+                print(f"[-] Error loading Volatility data from {vol_file}: {e}")
         
-        # Load Registry data
-        reg_df = pd.read_csv(reg_output) if reg_output else pd.DataFrame()
-        if not reg_df.empty:
-            reg_df['Data_Source'] = 'Registry'
+        # Load Registry data if available
+        if reg_files:
+            try:
+                reg_df = pd.read_csv(reg_files[0])
+                reg_df['Data_Source'] = 'Registry'
+                all_dfs.append(reg_df)
+                print(f"[+] Loaded Registry data with columns: {reg_df.columns.tolist()}")
+            except Exception as e:
+                print(f"[-] Error loading Registry data: {e}")
         
-        # Create multi-sheet Excel output
+        if not all_dfs:
+            print("[-] No data found to merge")
+            return False
+        
+        # Create outputs directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save individual sheets
         excel_output = os.path.join(output_dir, f"forensic_analysis_{timestamp}.xlsx")
         with pd.ExcelWriter(excel_output) as writer:
-            if not evtx_df.empty:
-                evtx_df.to_excel(writer, sheet_name='EVTX_Events', index=False)
+            for i, df in enumerate(all_dfs):
+                sheet_name = f"Data_Source_{i}"
+                try:
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    print(f"[+] Saved sheet {sheet_name}")
+                except Exception as e:
+                    print(f"[-] Error saving sheet {sheet_name}: {e}")
+        
+        # Create combined timeline based on available columns
+        try:
+            # Initialize empty lists for timeline entries
+            timeline_entries = []
             
-            for plugin_name, df in vol_dfs.items():
-                if not df.empty:
-                    df.to_excel(writer, sheet_name=f'Memory_{plugin_name}', index=False)
+            for df in all_dfs:
+                # Create a copy of the dataframe for timeline
+                timeline_df = df.copy()
+                
+                # Try to identify time-related columns
+                time_columns = [col for col in df.columns if any(time_word in col.lower() 
+                    for time_word in ['time', 'date', 'created', 'modified', 'accessed'])]
+                
+                # Try to identify description or message columns
+                desc_columns = [col for col in df.columns if any(desc_word in col.lower() 
+                    for desc_word in ['message', 'description', 'details', 'data', 'value', 'path'])]
+                
+                if time_columns:
+                    # Use the first time column found
+                    timeline_df['Timestamp'] = timeline_df[time_columns[0]]
+                else:
+                    timeline_df['Timestamp'] = pd.Timestamp.now()
+                
+                if desc_columns:
+                    # Use the first description column found
+                    timeline_df['Description'] = timeline_df[desc_columns[0]]
+                else:
+                    # Create a description from all available columns
+                    timeline_df['Description'] = timeline_df.apply(
+                        lambda x: ' | '.join(f"{k}: {v}" for k, v in x.items() if k != 'Data_Source'), 
+                        axis=1
+                    )
+                
+                # Select only necessary columns for timeline
+                timeline_df = timeline_df[['Timestamp', 'Description', 'Data_Source']]
+                timeline_entries.append(timeline_df)
             
-            if not reg_df.empty:
-                reg_df.to_excel(writer, sheet_name='Registry_Data', index=False)
+            # Combine all timeline entries
+            if timeline_entries:
+                combined_timeline = pd.concat(timeline_entries, ignore_index=True)
+                # Try to convert timestamp to datetime if it's not already
+                try:
+                    combined_timeline['Timestamp'] = pd.to_datetime(combined_timeline['Timestamp'])
+                    combined_timeline = combined_timeline.sort_values('Timestamp')
+                except Exception as e:
+                    print(f"[-] Error converting timestamps: {e}")
+                
+                timeline_output = os.path.join(output_dir, f"forensic_timeline_{timestamp}.csv")
+                combined_timeline.to_csv(timeline_output, index=False)
+                print(f"[+] Created combined timeline at {timeline_output}")
         
-        # Create timeline CSV
-        timeline_entries = []
-        
-        # Add EVTX events
-        if not evtx_df.empty:
-            evtx_timeline = evtx_df[['TimeCreated', 'EventID', 'Message']].copy()
-            evtx_timeline['Source'] = 'EVTX'
-            timeline_entries.append(evtx_timeline)
-        
-        # Add Volatility process data
-        if 'pslist' in vol_dfs and not vol_dfs['pslist'].empty:
-            vol_timeline = vol_dfs['pslist'][['start_time', 'process_name', 'pid']].copy()
-            vol_timeline['Source'] = 'Memory_Process'
-            timeline_entries.append(vol_timeline)
-        
-        # Add Registry data
-        if not reg_df.empty:
-            reg_timeline = reg_df[['LastWriteTime', 'KeyPath', 'ValueName']].copy()
-            reg_timeline['Source'] = 'Registry'
-            timeline_entries.append(reg_timeline)
-        
-        if timeline_entries:
-            timeline_output = os.path.join(output_dir, f"forensic_timeline_{timestamp}.csv")
-            combined_timeline = pd.concat(timeline_entries, ignore_index=True)
-            combined_timeline.to_csv(timeline_output, index=False)
+        except Exception as e:
+            print(f"[-] Error creating timeline: {e}")
         
         print(f"[+] Data merger completed. Outputs saved to {output_dir}")
         return True
