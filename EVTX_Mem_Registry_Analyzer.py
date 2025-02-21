@@ -84,7 +84,6 @@ def merge_forensic_data(output_dir):
     try:
         # Find relevant files
         evtx_files = glob.glob(os.path.join(output_dir, "*EvtxECmd*.csv"))
-        vol_files = glob.glob(os.path.join(output_dir, "vol_*.json"))
         reg_files = glob.glob(os.path.join(output_dir, "*RECmd*.csv"))
         
         all_dfs = []
@@ -98,18 +97,6 @@ def merge_forensic_data(output_dir):
                 print(f"[+] Loaded EVTX data with columns: {evtx_df.columns.tolist()}")
             except Exception as e:
                 print(f"[-] Error loading EVTX data: {e}")
-        
-        # Load Volatility data if available
-        for vol_file in vol_files:
-            try:
-                with open(vol_file, 'r') as f:
-                    vol_data = json.load(f)
-                vol_df = pd.DataFrame(vol_data)
-                vol_df['Data_Source'] = f'Memory_{os.path.basename(vol_file)}'
-                all_dfs.append(vol_df)
-                print(f"[+] Loaded Volatility data from {os.path.basename(vol_file)}")
-            except Exception as e:
-                print(f"[-] Error loading Volatility data from {vol_file}: {e}")
         
         # Load Registry data if available
         if reg_files:
