@@ -161,9 +161,9 @@ def main():
         os.makedirs(output_dir)
 
     # Run analysis tools
-    run_volatility(memory_image, output_dir)
-    run_evtxecmd(evtx_file, output_dir)
-    run_recmd(registry_hive, output_dir)
+    # run_volatility(memory_image, output_dir)
+    # run_evtxecmd(evtx_file, output_dir)
+    # run_recmd(registry_hive, output_dir)
 
     # Merge the results
     merge_forensic_data(output_dir)
