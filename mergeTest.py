@@ -8,133 +8,156 @@ import glob
 
 def run_evtxecmd(evtx_file, output_dir):
     """
-    Run EvtxECmd to parse EVTX files.
+    Run EvtxECmd to parse EVTX files and capture output.
     """
     print("[*] Running EvtxECmd...")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = os.path.join(output_dir, f"evtx_output_{timestamp}.csv")
+    
     cmd = [
         "EvtxECmd\\EvtxECmd.exe",
-        "-d", evtx_file,
-        "--csv", output_dir
+        "-f", evtx_file,
+        "--csv", output_file
     ]
     try:
-        subprocess.run(cmd, check=True)
-        print("[+] EvtxECmd completed successfully.")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        with open(os.path.join(output_dir, f"evtx_log_{timestamp}.txt"), 'w') as f:
+            f.write(result.stdout)
+        print(f"[+] EvtxECmd completed successfully. Output saved to {output_file}")
+        return output_file
     except subprocess.CalledProcessError as e:
         print(f"[-] EvtxECmd failed: {e}")
+        print(f"Error output: {e.stderr}")
         sys.exit(1)
 
 def run_volatility(memory_image, output_dir, profile="Win7SP1x64"):
     """
-    Run Volatility to analyze memory and save output in CSV format.
+    Run Volatility to analyze memory and capture output.
     """
     os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     print("[*] Running Volatility 2.6 Memory Analysis...")
 
+    outputs = {}
     plugins = {
-        "Image Information": ["imageinfo"],
-        "Registry Hives": ["hivelist"],
-        "Dump Registry": ["dumpregistry", "-D", "artifacts"],
-        "Dump Files": ["dumpfiles", "-r=.extx", "-D", "artifacts"],
+        "imageinfo": [],
+        "pslist": [],
+        "hivelist": [],
+        "filescan": []
     }
     
-    for desc, plugin in plugins.items():
-        output_txt_file = os.path.join(output_dir, f"{plugin[0]}.txt")
-        cmd = ["volatility_2.6\\volatility_2.6.exe", "-f", memory_image, "--profile=" + profile] + plugin
+    for plugin_name, plugin_args in plugins.items():
+        output_file = os.path.join(output_dir, f"vol_{plugin_name}_{timestamp}.json")
+        cmd = ["volatility_2.6\\volatility_2.6.exe", 
+               "-f", memory_image, 
+               "--profile=" + profile,
+               plugin_name,
+               "--output=json",
+               "--output-file=" + output_file] + plugin_args
         
         try:
-            print(f"[*] Running {desc} Analysis...")
-            with open(output_txt_file, "w") as out:
-                subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE, check=True)
-            print(f"[+] {desc} Analysis Completed. Output saved to {output_txt_file}")
+            print(f"[*] Running {plugin_name} analysis...")
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            outputs[plugin_name] = output_file
+            print(f"[+] {plugin_name} completed. Output saved to {output_file}")
         except subprocess.CalledProcessError as e:
-            print(f"[-] {desc} Analysis Failed: {e.stderr.decode()}")
+            print(f"[-] {plugin_name} failed: {e.stderr}")
+            continue
+    
+    return outputs
 
 def run_recmd(registry_hive, output_dir):
     """
-    Run RECmd to parse Registry hives.
+    Run RECmd to parse Registry hives and capture output.
     """
     print("[*] Running RECmd...")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = os.path.join(output_dir, f"registry_output_{timestamp}.csv")
+    
     cmd = [
         "RECmd\\RECmd.exe",
-        "-d", registry_hive,
+        "-f", registry_hive,
         "--bn", "DFIRBatch.reb",
-        "--csv", output_dir
+        "--csv", output_file
     ]
     try:
-        subprocess.run(cmd, shell=True, check=True)
-        print("[+] RECmd completed successfully.")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        with open(os.path.join(output_dir, f"recmd_log_{timestamp}.txt"), 'w') as f:
+            f.write(result.stdout)
+        print(f"[+] RECmd completed successfully. Output saved to {output_file}")
+        return output_file
     except subprocess.CalledProcessError as e:
         print(f"[-] RECmd failed: {e}")
+        print(f"Error output: {e.stderr}")
         sys.exit(1)
 
-def merge_forensic_data(output_dir):
+def merge_forensic_data(evtx_output, vol_outputs, reg_output, output_dir):
     """
     Merges outputs from all tools into organized Excel and CSV files.
     """
     print("[*] Merging forensic data outputs...")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     try:
-        # Find the most recent CSV files for each tool
-        evtx_files = glob.glob(os.path.join(output_dir, "*EvtxECmd*.csv"))
-        vol_files = glob.glob(os.path.join(output_dir, "imageinfo.txt"))  # Adjust based on actual output
-        reg_files = glob.glob(os.path.join(output_dir, "*RECmd*.csv"))
-        
         # Load EVTX data
-        evtx_df = pd.DataFrame()
-        if evtx_files:
-            evtx_df = pd.read_csv(evtx_files[0])
+        evtx_df = pd.read_csv(evtx_output) if evtx_output else pd.DataFrame()
+        if not evtx_df.empty:
             evtx_df['Data_Source'] = 'EVTX'
         
-        # Load Volatility data (adjust parsing based on actual output format)
-        vol_df = pd.DataFrame()
-        if vol_files:
-            with open(vol_files[0], 'r') as f:
-                # Parse the text file into a structured format
-                # This will need to be adjusted based on actual output format
-                vol_data = f.readlines()
-                # Add basic parsing logic here
-                vol_df = pd.DataFrame(vol_data, columns=['Raw_Data'])
-                vol_df['Data_Source'] = 'Memory'
+        # Load Volatility data
+        vol_dfs = {}
+        for plugin_name, output_file in vol_outputs.items():
+            try:
+                with open(output_file, 'r') as f:
+                    vol_data = json.load(f)
+                vol_dfs[plugin_name] = pd.DataFrame(vol_data)
+                vol_dfs[plugin_name]['Data_Source'] = f'Memory_{plugin_name}'
+            except (json.JSONDecodeError, FileNotFoundError) as e:
+                print(f"Warning: Could not load Volatility {plugin_name} data: {e}")
         
         # Load Registry data
-        reg_df = pd.DataFrame()
-        if reg_files:
-            reg_df = pd.read_csv(reg_files[0])
+        reg_df = pd.read_csv(reg_output) if reg_output else pd.DataFrame()
+        if not reg_df.empty:
             reg_df['Data_Source'] = 'Registry'
         
         # Create multi-sheet Excel output
-        output_xlsx = os.path.join(output_dir, "forensic_analysis_combined.xlsx")
-        with pd.ExcelWriter(output_xlsx) as writer:
+        excel_output = os.path.join(output_dir, f"forensic_analysis_{timestamp}.xlsx")
+        with pd.ExcelWriter(excel_output) as writer:
             if not evtx_df.empty:
                 evtx_df.to_excel(writer, sheet_name='EVTX_Events', index=False)
-            if not vol_df.empty:
-                vol_df.to_excel(writer, sheet_name='Memory_Analysis', index=False)
+            
+            for plugin_name, df in vol_dfs.items():
+                if not df.empty:
+                    df.to_excel(writer, sheet_name=f'Memory_{plugin_name}', index=False)
+            
             if not reg_df.empty:
                 reg_df.to_excel(writer, sheet_name='Registry_Data', index=False)
         
-        # Create unified timeline CSV
-        # Select and standardize relevant columns from each source
+        # Create timeline CSV
         timeline_entries = []
         
+        # Add EVTX events
         if not evtx_df.empty:
-            evtx_selected = evtx_df[['TimeCreated', 'EventID', 'Message']].copy()
-            evtx_selected['Source'] = 'EVTX'
-            timeline_entries.append(evtx_selected)
+            evtx_timeline = evtx_df[['TimeCreated', 'EventID', 'Message']].copy()
+            evtx_timeline['Source'] = 'EVTX'
+            timeline_entries.append(evtx_timeline)
         
-        if not vol_df.empty:
-            # Adjust column selection based on actual Volatility output
-            vol_selected = vol_df[['Raw_Data']].copy()
-            vol_selected['Source'] = 'Memory'
-            timeline_entries.append(vol_selected)
+        # Add Volatility process data
+        if 'pslist' in vol_dfs and not vol_dfs['pslist'].empty:
+            vol_timeline = vol_dfs['pslist'][['start_time', 'process_name', 'pid']].copy()
+            vol_timeline['Source'] = 'Memory_Process'
+            timeline_entries.append(vol_timeline)
         
+        # Add Registry data
         if not reg_df.empty:
-            reg_selected = reg_df[['LastWriteTime', 'KeyPath', 'ValueName']].copy()
-            reg_selected['Source'] = 'Registry'
-            timeline_entries.append(reg_selected)
+            reg_timeline = reg_df[['LastWriteTime', 'KeyPath', 'ValueName']].copy()
+            reg_timeline['Source'] = 'Registry'
+            timeline_entries.append(reg_timeline)
         
         if timeline_entries:
+            timeline_output = os.path.join(output_dir, f"forensic_timeline_{timestamp}.csv")
             combined_timeline = pd.concat(timeline_entries, ignore_index=True)
-            combined_timeline.to_csv(os.path.join(output_dir, "forensic_timeline.csv"), index=False)
+            combined_timeline.to_csv(timeline_output, index=False)
         
         print(f"[+] Data merger completed. Outputs saved to {output_dir}")
         return True
@@ -160,13 +183,13 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # Run analysis tools
-    run_volatility(memory_image, output_dir)
-    run_evtxecmd(evtx_file, output_dir)
-    run_recmd(registry_hive, output_dir)
+    # Run tools and capture their outputs
+    evtx_output = run_evtxecmd(evtx_file, output_dir)
+    vol_outputs = run_volatility(memory_image, output_dir)
+    reg_output = run_recmd(registry_hive, output_dir)
 
     # Merge the results
-    merge_forensic_data(output_dir)
+    merge_forensic_data(evtx_output, vol_outputs, reg_output, output_dir)
 
     print("[+] Analysis and merger completed successfully.")
 
