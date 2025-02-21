@@ -105,7 +105,7 @@ def run_recmd(registry_hive, output_dir):
     
     # Construct the command
     cmd = [
-        r"RECmd\RECmd.exe",
+        r"RECmd\\RECmd.exe",
         "-d", registry_hive,
         "--bn", r"RECmd\BatchExamples\UserActivity.reb",
         "--csv", individual_path,
