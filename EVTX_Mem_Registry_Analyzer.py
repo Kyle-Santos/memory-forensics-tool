@@ -1,7 +1,8 @@
 # EvtxECmd: Parses the EVTX file and outputs the results in CSV format.
-# Volatility: Analyzes the memory image and outputs the process list in JSON format.
+# Volatility: Analyzes the memory image and dumps the evtx logs and registry artifacts.
 # RECmd: Parses the Registry hive and outputs the results in CSV format.
 
+import time
 import subprocess
 import os
 import sys
@@ -34,6 +35,13 @@ def run_volatility(memory_image, output_dir, profile="Win7SP1x64"):
 
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
+    os.makedirs("artifacts/dumpfiles", exist_ok=True)
+
+    filescan_path = "artifacts/filescan.json"
+
+    # Check if the file exists and remove it
+    if os.path.exists(filescan_path):
+        os.remove(filescan_path)
     
     print("[*] Running Volatility 2.6 Memory Analysis...")
 
@@ -41,7 +49,8 @@ def run_volatility(memory_image, output_dir, profile="Win7SP1x64"):
         "Image Information": ["imageinfo"],
         "Registry Hives": ["hivelist"],
         "Dump Registry": ["dumpregistry", "-D", "artifacts"],
-        "Dump Files": ["dumpfiles", "-r=.extx", "-D", "artifacts"],
+        # "Dump EVTX Files": ["dumpfiles", "-r", "\\.evtx", "-D", "artifacts"],
+        "File Scan": ["filescan", "--output=json", "--output-file=artifacts/filescan.json"],
     }
     
     for desc, plugin in plugins.items():
@@ -53,8 +62,66 @@ def run_volatility(memory_image, output_dir, profile="Win7SP1x64"):
             with open(output_txt_file, "w") as out:
                 subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE, check=True)
             print(f"[+] {desc} Analysis Completed. Output saved to {output_txt_file}")
+
+            if desc == "File Scan":
+                offsets = extract_evtx_offsets(filescan_path)
+
+                for offset in offsets:
+                    cmd = [
+                        "volatility_2.6/volatility_2.6.exe",  
+                        "-f", memory_image,
+                        "--profile=" + profile,
+                        "dumpfiles",
+                        "-Q", hex(offset),  # Specify the offset of the .evtx file
+                        "-D", "artifacts/dumpfiles",  # Output directory for dumped files
+                    ]
+                    try:
+                        print(f"[*] Dumping EVTX file at offset {offset}...")
+                        subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+                        print(f"[+] Successfully dumped EVTX file at offset {offset}.")
+                    except subprocess.CalledProcessError as e:
+                        print(f"[-] Failed to dump EVTX file at offset {offset}: {e.stderr.decode()}")
+                                
         except subprocess.CalledProcessError as e:
             print(f"[-] {desc} Analysis Failed: {e.stderr.decode()}")
+
+
+def extract_evtx_offsets(json_file):
+    """
+    Extracts offsets of .evtx files from a Volatility JSON output.
+    """
+    evtx_offsets = []
+
+    # Load the JSON file
+    with open(json_file, "r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    # Iterate over the parsed JSON data
+    for row in data["rows"]:
+        offset = row[0]  # Offset is the first element
+        file_path = row[4]  # File path is the last element
+
+        # Check if the file path contains ".evtx"
+        if ".evtx" in file_path.lower():
+            evtx_offsets.append(offset)
+
+    return evtx_offsets
+
+
+def rename_and_move_evtx_files():
+    """Rename valid EVTX files and move them to a separate directory."""
+
+    for filename in os.listdir("artifacts/dumpfiles"):
+        if filename.startswith("file.None.") and (filename.endswith(".dat") or filename.endswith(".vacb")):
+            filepath = os.path.join("artifacts/dumpfiles", filename)
+            
+            new_filename = filename + ".evtx"
+            new_filepath = os.path.join("artifacts", new_filename)
+            
+            os.rename(filepath, new_filepath)
+            # os.remove(filepath)
+            # print(f"[+] Renamed and moved: {filename} -> {new_filepath}")
+           
 
 def run_recmd(registry_hive, output_dir):
     """
@@ -197,6 +264,8 @@ def merge_forensic_data(output_dir):
         return False
 
 
+
+
 def main():
     if len(sys.argv) != 5:
         print("\nUsage: python combine_tools.py <evtx_file> <memory_image> <registry_hive> <output_dir>\n")
@@ -205,6 +274,8 @@ def main():
               "<registry_hive>: Path to the Registry hive file for RECmd.",
               "<output_dir>: Directory where the output files will be saved.\n", sep="\n")
         sys.exit(1)
+
+    start_time = time.time()  # Start time
 
     evtx_file = sys.argv[1]
     memory_image = sys.argv[2]
@@ -215,18 +286,22 @@ def main():
         os.makedirs(output_dir)
 
     # Run Volatility
-    run_volatility(memory_image, output_dir)
+    # run_volatility(memory_image, output_dir)
+    # rename_and_move_evtx_files()
 
     # Run EvtxECmd
-    run_evtxecmd(evtx_file, output_dir)
+    # run_evtxecmd(evtx_file, output_dir)
 
     # Run RECmd
-    run_recmd(registry_hive, output_dir)
+    # run_recmd(registry_hive, output_dir)
 
     # Merge the results
     merge_forensic_data(output_dir)
 
-    print("[+] All tools executed successfully.")
+    end_time = time.time()  # End time
+    elapsed_time = end_time - start_time
+
+    print(f"[+] All tools executed successfully in {elapsed_time:.2f} seconds.")
 
 if __name__ == "__main__":
     main()

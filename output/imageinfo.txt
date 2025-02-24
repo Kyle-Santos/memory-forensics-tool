@@ -1,6 +1,6 @@
           Suggested Profile(s) : Win7SP1x64, Win7SP0x64, Win2008R2SP0x64, Win2008R2SP1x64_23418, Win2008R2SP1x64, Win7SP1x64_23418
                      AS Layer1 : WindowsAMD64PagedMemory (Kernel AS)
-                     AS Layer2 : FileAddressSpace (C:\Users\Chanel\Desktop\MP2\W7-FTK.mem)
+                     AS Layer2 : FileAddressSpace (C:\Users\user\OneDrive - De La Salle University - Manila\Desktop\MP2\W7-FTK.mem)
                       PAE type : No PAE
                            DTB : 0x187000L
                           KDBG : 0xf80002bfc0a0L
