@@ -125,6 +125,15 @@ def merge_forensic_data(output_dir):
                     print(f"[+] Saved sheet {sheet_name}")
                 except Exception as e:
                     print(f"[-] Error saving sheet {sheet_name}: {e}")
+
+            # Save forensic timeline as a new sheet
+            if timeline_entries:
+                try:
+                    combined_timeline.to_excel(writer, sheet_name="Forensic_Timeline", index=False)
+                    print("[+] Saved forensic timeline as 'Forensic_Timeline' sheet")
+                except Exception as e:
+                    print(f"[-] Error saving forensic timeline: {e}")
+
         
         # Create combined timeline based on available columns
         try:
