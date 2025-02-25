@@ -148,6 +148,9 @@ def merge_forensic_data(output_dir):
     print("[*] Merging forensic data outputs...")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
+    # Create outputs directory if it doesn't exist (moved up)
+    os.makedirs(output_dir, exist_ok=True)
+    
     try:
         # Find relevant files
         evtx_files = glob.glob(os.path.join(output_dir, "*EvtxECmd*.csv"))
@@ -179,34 +182,11 @@ def merge_forensic_data(output_dir):
             print("[-] No data found to merge")
             return False
         
-        # Create outputs directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
+        # Create combined timeline based on available columns (moved before Excel writer)
+        timeline_entries = []
+        combined_timeline = None
         
-        # Save individual sheets
-        excel_output = os.path.join(output_dir, f"forensic_analysis_{timestamp}.xlsx")
-        with pd.ExcelWriter(excel_output) as writer:
-            for i, df in enumerate(all_dfs):
-                sheet_name = f"Data_Source_{i}"
-                try:
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-                    print(f"[+] Saved sheet {sheet_name}")
-                except Exception as e:
-                    print(f"[-] Error saving sheet {sheet_name}: {e}")
-
-            # Save forensic timeline as a new sheet
-            if timeline_entries:
-                try:
-                    combined_timeline.to_excel(writer, sheet_name="Forensic_Timeline", index=False)
-                    print("[+] Saved forensic timeline as 'Forensic_Timeline' sheet")
-                except Exception as e:
-                    print(f"[-] Error saving forensic timeline: {e}")
-
-        
-        # Create combined timeline based on available columns
         try:
-            # Initialize empty lists for timeline entries
-            timeline_entries = []
-            
             for df in all_dfs:
                 # Create a copy of the dataframe for timeline
                 timeline_df = df.copy()
@@ -223,7 +203,8 @@ def merge_forensic_data(output_dir):
                     # Use the first time column found
                     timeline_df['Timestamp'] = timeline_df[time_columns[0]]
                 else:
-                    timeline_df['Timestamp'] = pd.Timestamp.now()
+                    # Mark as unknown timestamp instead of using current time
+                    timeline_df['Timestamp'] = "Unknown Time"
                 
                 if desc_columns:
                     # Use the first description column found
@@ -244,7 +225,11 @@ def merge_forensic_data(output_dir):
                 combined_timeline = pd.concat(timeline_entries, ignore_index=True)
                 # Try to convert timestamp to datetime if it's not already
                 try:
-                    combined_timeline['Timestamp'] = pd.to_datetime(combined_timeline['Timestamp'])
+                    # Convert only entries that aren't "Unknown Time"
+                    mask = combined_timeline['Timestamp'] != "Unknown Time"
+                    if mask.any():
+                        combined_timeline.loc[mask, 'Timestamp'] = pd.to_datetime(
+                            combined_timeline.loc[mask, 'Timestamp'], errors='coerce')
                     combined_timeline = combined_timeline.sort_values('Timestamp')
                 except Exception as e:
                     print(f"[-] Error converting timestamps: {e}")
@@ -255,6 +240,26 @@ def merge_forensic_data(output_dir):
         
         except Exception as e:
             print(f"[-] Error creating timeline: {e}")
+            # Still continue to save other data even if timeline creation fails
+        
+        # Save individual sheets
+        excel_output = os.path.join(output_dir, f"forensic_analysis_{timestamp}.xlsx")
+        with pd.ExcelWriter(excel_output) as writer:
+            for i, df in enumerate(all_dfs):
+                sheet_name = f"Data_Source_{i}"
+                try:
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    print(f"[+] Saved sheet {sheet_name}")
+                except Exception as e:
+                    print(f"[-] Error saving sheet {sheet_name}: {e}")
+
+            # Save forensic timeline as a new sheet
+            if combined_timeline is not None:
+                try:
+                    combined_timeline.to_excel(writer, sheet_name="Forensic_Timeline", index=False)
+                    print("[+] Saved forensic timeline as 'Forensic_Timeline' sheet")
+                except Exception as e:
+                    print(f"[-] Error saving forensic timeline: {e}")
         
         print(f"[+] Data merger completed. Outputs saved to {output_dir}")
         return True
@@ -262,8 +267,6 @@ def merge_forensic_data(output_dir):
     except Exception as e:
         print(f"[-] Error merging data: {str(e)}")
         return False
-
-
 
 
 def main():
