@@ -141,128 +141,68 @@ def run_recmd(registry_hive, output_dir):
         print(f"[-] RECmd failed: {e}")
         sys.exit(1)
 
+def rename_and_move_evtx_files():
+    """Rename valid EVTX files and move them to a separate directory."""
+    evtx_dir = "artifacts"
+    dump_dir = "artifacts/dumpfiles"
+
+    os.makedirs(evtx_dir, exist_ok=True)  # Ensure destination directory exists
+
+    for filename in os.listdir(dump_dir):
+        if filename.startswith("file.None.") and (filename.endswith(".dat") or filename.endswith(".vacb")):
+            filepath = os.path.join(dump_dir, filename)
+            new_filename = filename + ".evtx"
+            new_filepath = os.path.join(evtx_dir, new_filename)
+
+            # If the destination file already exists, rename it or delete it before moving
+            if os.path.exists(new_filepath):
+                print(f"[!] File {new_filepath} already exists. Deleting and replacing it.")
+                os.remove(new_filepath)  # Remove the existing file
+
+            os.rename(filepath, new_filepath)
+            print(f"[+] Renamed and moved: {filename} -> {new_filepath}")
+
+
 def merge_forensic_data(output_dir):
     """
-    Merges outputs from all tools into organized Excel and CSV files with flexible column handling.
+    Merges outputs from all tools into a single CSV file with flexible column handling.
     """
     print("[*] Merging forensic data outputs...")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_csv_path = os.path.join(output_dir, f"forensic_analysis_{timestamp}.csv")
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
     
     try:
-        # Find relevant files
-        evtx_files = glob.glob(os.path.join(output_dir, "*EvtxECmd*.csv"))
-        reg_files = glob.glob(os.path.join(output_dir, "*RECmd*.csv"))
-        
+        # Find all relevant CSV files
+        csv_files = glob.glob(os.path.join(output_dir, "*.csv"))
         all_dfs = []
         
-        # Load EVTX data if available
-        if evtx_files:
+        for file in csv_files:
             try:
-                evtx_df = pd.read_csv(evtx_files[0])
-                evtx_df['Data_Source'] = 'EVTX'
-                all_dfs.append(evtx_df)
-                print(f"[+] Loaded EVTX data with columns: {evtx_df.columns.tolist()}")
+                df = pd.read_csv(file)
+                df['Source_File'] = os.path.basename(file)  # Track source of data
+                all_dfs.append(df)
+                print(f"[+] Loaded {file} with columns: {df.columns.tolist()}")
             except Exception as e:
-                print(f"[-] Error loading EVTX data: {e}")
-        
-        # Load Registry data if available
-        if reg_files:
-            try:
-                reg_df = pd.read_csv(reg_files[0])
-                reg_df['Data_Source'] = 'Registry'
-                all_dfs.append(reg_df)
-                print(f"[+] Loaded Registry data with columns: {reg_df.columns.tolist()}")
-            except Exception as e:
-                print(f"[-] Error loading Registry data: {e}")
+                print(f"[-] Error loading {file}: {e}")
         
         if not all_dfs:
             print("[-] No data found to merge")
             return False
         
-        # Create outputs directory if it doesn't exist
-        os.makedirs(output_dir, exist_ok=True)
+        # Merge all data into one DataFrame
+        merged_df = pd.concat(all_dfs, ignore_index=True, sort=False)
         
-        # Save individual sheets
-        excel_output = os.path.join(output_dir, f"forensic_analysis_{timestamp}.xlsx")
-        with pd.ExcelWriter(excel_output) as writer:
-            for i, df in enumerate(all_dfs):
-                sheet_name = f"Data_Source_{i}"
-                try:
-                    df.to_excel(writer, sheet_name=sheet_name, index=False)
-                    print(f"[+] Saved sheet {sheet_name}")
-                except Exception as e:
-                    print(f"[-] Error saving sheet {sheet_name}: {e}")
-
-            # Save forensic timeline as a new sheet
-            if timeline_entries:
-                try:
-                    combined_timeline.to_excel(writer, sheet_name="Forensic_Timeline", index=False)
-                    print("[+] Saved forensic timeline as 'Forensic_Timeline' sheet")
-                except Exception as e:
-                    print(f"[-] Error saving forensic timeline: {e}")
-
-        
-        # Create combined timeline based on available columns
-        try:
-            # Initialize empty lists for timeline entries
-            timeline_entries = []
-            
-            for df in all_dfs:
-                # Create a copy of the dataframe for timeline
-                timeline_df = df.copy()
-                
-                # Try to identify time-related columns
-                time_columns = [col for col in df.columns if any(time_word in col.lower() 
-                    for time_word in ['time', 'date', 'created', 'modified', 'accessed'])]
-                
-                # Try to identify description or message columns
-                desc_columns = [col for col in df.columns if any(desc_word in col.lower() 
-                    for desc_word in ['message', 'description', 'details', 'data', 'value', 'path'])]
-                
-                if time_columns:
-                    # Use the first time column found
-                    timeline_df['Timestamp'] = timeline_df[time_columns[0]]
-                else:
-                    timeline_df['Timestamp'] = pd.Timestamp.now()
-                
-                if desc_columns:
-                    # Use the first description column found
-                    timeline_df['Description'] = timeline_df[desc_columns[0]]
-                else:
-                    # Create a description from all available columns
-                    timeline_df['Description'] = timeline_df.apply(
-                        lambda x: ' | '.join(f"{k}: {v}" for k, v in x.items() if k != 'Data_Source'), 
-                        axis=1
-                    )
-                
-                # Select only necessary columns for timeline
-                timeline_df = timeline_df[['Timestamp', 'Description', 'Data_Source']]
-                timeline_entries.append(timeline_df)
-            
-            # Combine all timeline entries
-            if timeline_entries:
-                combined_timeline = pd.concat(timeline_entries, ignore_index=True)
-                # Try to convert timestamp to datetime if it's not already
-                try:
-                    combined_timeline['Timestamp'] = pd.to_datetime(combined_timeline['Timestamp'])
-                    combined_timeline = combined_timeline.sort_values('Timestamp')
-                except Exception as e:
-                    print(f"[-] Error converting timestamps: {e}")
-                
-                timeline_output = os.path.join(output_dir, f"forensic_timeline_{timestamp}.csv")
-                combined_timeline.to_csv(timeline_output, index=False)
-                print(f"[+] Created combined timeline at {timeline_output}")
-        
-        except Exception as e:
-            print(f"[-] Error creating timeline: {e}")
-        
-        print(f"[+] Data merger completed. Outputs saved to {output_dir}")
+        # Save merged data to a single CSV file
+        merged_df.to_csv(output_csv_path, index=False)
+        print(f"[+] Merged forensic data saved to {output_csv_path}")
         return True
     
     except Exception as e:
         print(f"[-] Error merging data: {str(e)}")
         return False
-
 
 
 
