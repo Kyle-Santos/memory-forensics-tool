@@ -268,7 +268,7 @@ def merge_forensic_data(output_dir):
 
 def main():
     if len(sys.argv) != 5:
-        print("\nUsage: python combine_tools.py <evtx_file> <memory_image> <registry_hive> <output_dir>\n")
+        print("\nUsage: python EVTX_Mem_Registry_Analyzer.py <evtx_artifacts> <memory_image> <registry_artifacts> <output_dir>\n")
         print("<evtx_file>: Path to the EVTX file you want to analyze.",
               "<memory_image>: Path to the memory image file for Volatility.",
               "<registry_hive>: Path to the Registry hive file for RECmd.",
