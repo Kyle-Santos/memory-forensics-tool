@@ -186,6 +186,19 @@ def merge_forensic_data(output_dir):
                 df["ArtifactType"] = "Unknown"
                 df["Description"] = None
 
+            # Merge USerId, UserName, Computer, RemoteHost into UserInfo
+            if {"UserId", "UserName", "Computer", "RemoteHost"}.issubset(df.columns):
+                df["UserInfo"] = df.apply(
+                    lambda row: " | ".join(
+                        f"{key}: {val}" for key, val in {
+                            "UserId": row["UserId"],
+                            "UserName": row["UserName"],
+                            "Computer": row["Computer"],
+                            "RemoteHost": row["RemoteHost"]
+                        }.items() if pd.notna(val) and val != ""
+                    ), axis=1
+                )
+                
             # Merge ProcessId, ThreadId, and ExecutableInfo into ProcessDetails
             if {"ProcessId", "ThreadId", "ExecutableInfo"}.issubset(df.columns):
                 df["ProcessDetails"] = df.apply(
@@ -220,7 +233,8 @@ def merge_forensic_data(output_dir):
     excluded_cols = ["LastWriteTimestamp", "TimeCreated", "HivePath", "SourceFile", "MapDescription", 
                      "Description", "EventRecordId", "ChunkNumber", "ExtraDataOffset", "PluginDetailFile", 
                      "Keywords", "Comment", "PayloadData1", "PayloadData2", "PayloadData3", "PayloadData4", 
-                     "PayloadData5", "PayloadData6", "ProcessId", "ThreadId", "ExecutableInfo"]
+                     "PayloadData5", "PayloadData6", "ProcessId", "ThreadId", "ExecutableInfo",
+                     "UserId", "UserName", "Computer", "RemoteHost"]
     
     norm_cols = ["Timeline (UTC)", "ArtifactType", "Description"]
     other_cols = [col for col in merged_df.columns if col not in norm_cols and col not in excluded_cols]
