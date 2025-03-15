@@ -207,7 +207,8 @@ def merge_forensic_data(output_dir):
     # Reorder the final dataframe so that the first three columns are normalized
     excluded_cols = ["LastWriteTimestamp", "TimeCreated", "HivePath", "SourceFile", "MapDescription", 
                      "Description", "EventRecordId", "ChunkNumber", "ExtraDataOffset", "PluginDetailFile", 
-                     "Keywords", "Comment"]
+                     "Keywords", "Comment", "PayloadData1", "PayloadData2", "PayloadData3", "PayloadData4", 
+                     "PayloadData5", "PayloadData6"]
     norm_cols = ["Timeline (UTC)", "ArtifactType", "Description"]
     other_cols = [col for col in merged_df.columns if col not in norm_cols and col not in excluded_cols]
     merged_df = merged_df[norm_cols + other_cols]

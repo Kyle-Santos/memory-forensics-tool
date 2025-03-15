@@ -1,0 +1,21 @@
+﻿Timestamp,BatchKeyPath,FileName,BatchValueName,Path1,Path2
+2025-01-15 06:16:44.9533997,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\cmmgr32.exe,cmmgr32.exe,Multiple,,
+2025-02-07 11:49:53.8272181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\dvdmaker.exe,dvdmaker.exe,Multiple,%ProgramFiles%\DVD Maker\dvdmaker.exe,
+2025-01-15 06:16:44.9533997,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\IEXPLORE.EXE,IEXPLORE.EXE,Multiple,C:\Program Files (x86)\Internet Explorer\IEXPLORE.EXE,C:\Program Files (x86)\Internet Explorer;
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\install.exe,install.exe,Multiple,,
+2025-02-07 11:49:53.7960180,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\Journal.exe,Journal.exe,Multiple,%ProgramFiles%\Windows Journal\Journal.exe,
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\migwiz.exe,migwiz.exe,Multiple,,
+2025-02-07 11:49:53.9052182,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\mip.exe,mip.exe,Multiple,%CommonProgramFiles%\Microsoft Shared\Ink\mip.exe,
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\mplayer2.exe,mplayer2.exe,Multiple,%ProgramFiles(x86)%\Windows Media Player\wmplayer.exe,%ProgramFiles(x86)%\Windows Media Player
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\pbrush.exe,pbrush.exe,Multiple,%SystemRoot%\System32\mspaint.exe,%SystemRoot%\System32
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\PowerShell.exe,PowerShell.exe,Multiple,%SystemRoot%\system32\WindowsPowerShell\v1.0\PowerShell.exe,%SystemRoot%\system32\WindowsPowerShell\v1.0\
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\setup.exe,setup.exe,Multiple,,
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\sidebar.exe,sidebar.exe,Multiple,"""%ProgramFiles%\Windows Sidebar\sidebar.exe""",
+2025-02-07 11:49:53.8740182,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\SnippingTool.exe,SnippingTool.exe,Multiple,%SystemRoot%\system32\SnippingTool.exe,
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\table30.exe,table30.exe,Multiple,,
+2025-02-07 11:49:53.8584182,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\TabTip.exe,TabTip.exe,Multiple,%CommonProgramFiles%\microsoft shared\ink\TabTip.exe,
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\wab.exe,wab.exe,Multiple,%ProgramFiles%\Windows Mail\wab.exe,%ProgramFiles%\Windows Mail
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\wabmig.exe,wabmig.exe,Multiple,%ProgramFiles%\Windows Mail\wabmig.exe,
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\wmplayer.exe,wmplayer.exe,Multiple,%ProgramFiles(x86)%\Windows Media Player\wmplayer.exe,%ProgramFiles(x86)%\Windows Media Player
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\WORDPAD.EXE,WORDPAD.EXE,Multiple,"""%ProgramFiles%\Windows NT\Accessories\WORDPAD.EXE""",
+2009-07-14 04:53:25.7960181,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows\CurrentVersion\App Paths\WRITE.EXE,WRITE.EXE,Multiple,"""%ProgramFiles%\Windows NT\Accessories\WORDPAD.EXE""",
