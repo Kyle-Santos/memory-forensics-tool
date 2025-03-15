@@ -206,8 +206,8 @@ def main():
         os.makedirs(output_dir)
 
     # Run Volatility
-    run_volatility(memory_image, output_dir)
-    rename_and_move_evtx_files()
+    # run_volatility(memory_image, output_dir)
+    # rename_and_move_evtx_files()
 
     # Run EvtxECmd
     run_evtxecmd(evtx_file, output_dir)
