@@ -1,8 +1,0 @@
-﻿Timestamp,BatchKeyPath,DriveName,BatchValueName,VolumeLabel,DriveType
-2009-07-14 05:09:50.6845321,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows Search\VolumeInfoCache\C:,C:,Multiple,,Fixed
-2009-07-14 05:09:50.6845321,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows Search\VolumeInfoCache\D:,D:,Multiple,TestOS,Fixed
-2025-02-07 11:59:25.2803653,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows Search\VolumeInfoCache\E:,E:,Multiple,Extra,Fixed
-2009-07-14 05:09:50.7001321,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows Search\VolumeInfoCache\F:,F:,Multiple,,Fixed
-2009-07-14 05:09:50.7001321,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows Search\VolumeInfoCache\G:,G:,Multiple,,Fixed
-2009-07-14 05:09:50.7001321,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows Search\VolumeInfoCache\H:,H:,Multiple,,Fixed
-2009-07-14 05:09:50.7001321,CMI-CreateHive{199DAFC2-6F16-4946-BF90-5A3FC3A60902}\Microsoft\Windows Search\VolumeInfoCache\I:,I:,Multiple,,Fixed
