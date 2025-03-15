@@ -1,5 +1,5 @@
-# EvtxECmd: Parses the EVTX file and outputs the results in CSV format.
 # Volatility: Analyzes the memory image and dumps the evtx logs and registry artifacts.
+# EvtxECmd: Parses the EVTX file and outputs the results in CSV format.
 # RECmd: Parses the Registry hive and outputs the results in CSV format.
 
 import time
@@ -85,7 +85,6 @@ def run_volatility(memory_image, output_dir, profile="Win7SP1x64"):
         except subprocess.CalledProcessError as e:
             print(f"[-] {desc} Analysis Failed: {e.stderr.decode()}")
 
-
 def extract_evtx_offsets(json_file):
     """
     Extracts offsets of .evtx files from a Volatility JSON output.
@@ -106,22 +105,6 @@ def extract_evtx_offsets(json_file):
             evtx_offsets.append(offset)
 
     return evtx_offsets
-
-
-def rename_and_move_evtx_files():
-    """Rename valid EVTX files and move them to a separate directory."""
-
-    for filename in os.listdir("artifacts/dumpfiles"):
-        if filename.startswith("file.None.") and (filename.endswith(".dat") or filename.endswith(".vacb")):
-            filepath = os.path.join("artifacts/dumpfiles", filename)
-            
-            new_filename = filename + ".evtx"
-            new_filepath = os.path.join("artifacts", new_filename)
-            
-            os.rename(filepath, new_filepath)
-            # os.remove(filepath)
-            # print(f"[+] Renamed and moved: {filename} -> {new_filepath}")
-           
 
 def run_recmd(registry_hive, output_dir):
     """
@@ -207,20 +190,17 @@ def merge_forensic_data(output_dir):
 
 
 def main():
-    if len(sys.argv) != 5:
-        print("\nUsage: python EVTX_Mem_Registry_Analyzer.py <evtx_artifacts> <memory_image> <registry_artifacts> <output_dir>\n")
-        print("<evtx_file>: Path to the EVTX file you want to analyze.",
-              "<memory_image>: Path to the memory image file for Volatility.",
-              "<registry_hive>: Path to the Registry hive file for RECmd.",
-              "<output_dir>: Directory where the output files will be saved.\n", sep="\n")
+    if len(sys.argv) != 2:
+        print("\nUsage: python EVTX_Mem_Registry_Analyzer.py <memory_image>\n")
+        print("<memory_image>: Path to the memory image file for Volatility.",)
         sys.exit(1)
 
     start_time = time.time()  # Start time
 
-    evtx_file = sys.argv[1]
-    memory_image = sys.argv[2]
-    registry_hive = sys.argv[3]
-    output_dir = sys.argv[4]
+    evtx_file = "artifacts\\"
+    memory_image = sys.argv[1]
+    registry_hive = "artifacts\\"
+    output_dir = "output\\"
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -241,7 +221,7 @@ def main():
     end_time = time.time()  # End time
     elapsed_time = end_time - start_time
 
-    print(f"[+] All tools executed successfully in {elapsed_time:.2f} seconds.")
+    print(f"\n[+] All tools executed successfully in {elapsed_time:.2f} seconds.")
 
 if __name__ == "__main__":
     main()
