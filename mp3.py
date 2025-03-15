@@ -151,7 +151,7 @@ def merge_forensic_data(output_dir):
     Merges outputs from EvtxECmd and RECmd into a single CSV where only the first three columns are normalized:
       A) Timeline (UTC)
       B) ArtifactType
-      C) RecordNumber
+      C) Description
     All other original columns are printed as-is.
     """
     print("[*] Merging forensic data outputs with first three columns normalized...")
@@ -174,24 +174,21 @@ def merge_forensic_data(output_dir):
                 df["Timeline (UTC)"] = pd.to_datetime(df["TimeCreated"], errors="coerce", utc=True)
                 df["ArtifactType"] = "Evtx"
                 # Use the original RecordNumber if it exists, else leave as None
-                df["RecordNumber"] = df.get("RecordNumber", None)
                 df["Description"] = df.get("MapDescription", None) 
             elif "LastWriteTimestamp" in df.columns:
                 # Registry data
                 df["Timeline (UTC)"] = pd.to_datetime(df["LastWriteTimestamp"], errors="coerce", utc=True)
                 df["ArtifactType"] = "Registry"
-                df["RecordNumber"] = None
                 df["Description"] = df.get("Description", "").astype(str) + " | " + df.get("Comment", "").astype(str)
             else:
                 # Unrecognized data; mark accordingly
                 df["Timeline (UTC)"] = pd.NaT
                 df["ArtifactType"] = "Unknown"
-                df["RecordNumber"] = None
                 df["Description"] = None
             
             # Reorder columns: ensure the normalized columns come first,
             # followed by all other original columns.
-            norm_cols = ["Timeline (UTC)", "ArtifactType", "RecordNumber", "Description"]
+            norm_cols = ["Timeline (UTC)", "ArtifactType", "Description"]
             other_cols = [col for col in df.columns if col not in norm_cols]
             df = df[norm_cols + other_cols]
             
@@ -211,7 +208,7 @@ def merge_forensic_data(output_dir):
     excluded_cols = ["LastWriteTimestamp", "TimeCreated", "HivePath", "SourceFile", "MapDescription", 
                      "Description", "EventRecordId", "ChunkNumber", "ExtraDataOffset", "PluginDetailFile", 
                      "Keywords", "Comment"]
-    norm_cols = ["Timeline (UTC)", "ArtifactType", "RecordNumber", "Description"]
+    norm_cols = ["Timeline (UTC)", "ArtifactType", "Description"]
     other_cols = [col for col in merged_df.columns if col not in norm_cols and col not in excluded_cols]
     merged_df = merged_df[norm_cols + other_cols]
     
