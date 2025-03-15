@@ -149,7 +149,7 @@ def rename_and_move_evtx_files():
 def merge_forensic_data(output_dir):
     """
     Merges outputs from EvtxECmd and RECmd into a single CSV where only the first three columns are normalized:
-      A) TimeCreated/UTC
+      A) Timeline (UTC)
       B) ArtifactType
       C) RecordNumber
     All other original columns are printed as-is.
@@ -171,24 +171,27 @@ def merge_forensic_data(output_dir):
             # Add normalized columns based on type
             if "TimeCreated" in df.columns:
                 # EVTX data
-                df["TimeCreated/UTC"] = pd.to_datetime(df["TimeCreated"], errors="coerce", utc=True)
+                df["Timeline (UTC)"] = pd.to_datetime(df["TimeCreated"], errors="coerce", utc=True)
                 df["ArtifactType"] = "Evtx"
                 # Use the original RecordNumber if it exists, else leave as None
                 df["RecordNumber"] = df.get("RecordNumber", None)
+                df["Description"] = df.get("MapDescription", None) 
             elif "LastWriteTimestamp" in df.columns:
                 # Registry data
-                df["TimeCreated/UTC"] = pd.to_datetime(df["LastWriteTimestamp"], errors="coerce", utc=True)
+                df["Timeline (UTC)"] = pd.to_datetime(df["LastWriteTimestamp"], errors="coerce", utc=True)
                 df["ArtifactType"] = "Registry"
                 df["RecordNumber"] = None
+                df["Description"] = df.get("Description", "").astype(str) + " | " + df.get("Comment", "").astype(str)
             else:
                 # Unrecognized data; mark accordingly
-                df["TimeCreated/UTC"] = pd.NaT
+                df["Timeline (UTC)"] = pd.NaT
                 df["ArtifactType"] = "Unknown"
                 df["RecordNumber"] = None
+                df["Description"] = None
             
             # Reorder columns: ensure the normalized columns come first,
             # followed by all other original columns.
-            norm_cols = ["TimeCreated/UTC", "ArtifactType", "RecordNumber"]
+            norm_cols = ["Timeline (UTC)", "ArtifactType", "RecordNumber", "Description"]
             other_cols = [col for col in df.columns if col not in norm_cols]
             df = df[norm_cols + other_cols]
             
@@ -205,12 +208,15 @@ def merge_forensic_data(output_dir):
     merged_df = pd.concat(all_dfs, ignore_index=True, sort=False)
     
     # Reorder the final dataframe so that the first three columns are normalized
-    norm_cols = ["TimeCreated/UTC", "ArtifactType", "RecordNumber"]
-    other_cols = [col for col in merged_df.columns if col not in norm_cols]
+    excluded_cols = ["LastWriteTimestamp", "TimeCreated", "HivePath", "SourceFile", "MapDescription", 
+                     "Description", "EventRecordId", "ChunkNumber", "ExtraDataOffset", "PluginDetailFile", 
+                     "Keywords", "Comment"]
+    norm_cols = ["Timeline (UTC)", "ArtifactType", "RecordNumber", "Description"]
+    other_cols = [col for col in merged_df.columns if col not in norm_cols and col not in excluded_cols]
     merged_df = merged_df[norm_cols + other_cols]
     
     # Sort the merged data chronologically based on the normalized time column
-    merged_df.sort_values(by="TimeCreated/UTC", inplace=True, na_position="first")
+    merged_df.sort_values(by="Timeline (UTC)", inplace=True, na_position="first")
     
     merged_df.to_csv(output_csv_path, index=False)
     print(f"[+] Merged forensic data saved to {output_csv_path}")
